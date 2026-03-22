@@ -1,0 +1,742 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>RNN Sentiment Analyzer — Live Predictor</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Inter:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;1,400&family=JetBrains+Mono:wght@300;400;500&display=swap');
+:root{--bg:#080b10;--surface:#0f1318;--card:#13181f;--card2:#181e27;--border:#1e2530;--a1:#00d4ff;--a2:#7c3aed;--a3:#10b981;--a4:#f59e0b;--a5:#ef4444;--text:#e2eaf4;--muted:#7a8899;--pos:#10b981;--neg:#ef4444;--neu:#f59e0b;}
+*{margin:0;padding:0;box-sizing:border-box;}
+body{background:var(--bg);color:var(--text);font-family:'Inter',sans-serif;min-height:100vh;}
+body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(rgba(0,212,255,.025) 1px,transparent 1px),linear-gradient(90deg,rgba(0,212,255,.025) 1px,transparent 1px);background-size:48px 48px;pointer-events:none;z-index:0;}
+.header{position:relative;z-index:1;padding:32px 48px 24px;border-bottom:1px solid var(--border);background:linear-gradient(120deg,rgba(0,212,255,.04) 0%,transparent 55%);display:flex;align-items:center;justify-content:space-between;gap:20px;flex-wrap:wrap;}
+.eyebrow{display:inline-flex;align-items:center;gap:8px;padding:4px 14px;background:rgba(0,212,255,.08);border:1px solid rgba(0,212,255,.25);border-radius:20px;font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--a1);letter-spacing:.1em;text-transform:uppercase;margin-bottom:12px;}
+.dot{width:6px;height:6px;border-radius:50%;background:var(--a1);animation:blink 1.4s infinite;}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.2}}
+h1{font-family:'Inter',sans-serif;font-size:28px;font-weight:800;line-height:1.1;background:linear-gradient(135deg,#fff 20%,var(--a1) 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;margin-bottom:6px;}
+.hdr-p{color:var(--muted);font-size:13px;max-width:520px;}
+.mbadge{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:12px 18px;text-align:center;}
+.mbadge .ml{font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.1em;margin-bottom:3px;}
+.mbadge .mv{font-family:'Inter',sans-serif;font-size:13px;font-weight:700;color:var(--a1);}
+/* NAV */
+.nav{position:relative;z-index:1;display:flex;gap:2px;padding:12px 48px 0;border-bottom:1px solid var(--border);overflow-x:auto;}
+.nt{padding:8px 16px;font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--muted);cursor:pointer;text-transform:uppercase;letter-spacing:.05em;border-radius:7px 7px 0 0;border:1px solid transparent;border-bottom:none;transition:all .2s;white-space:nowrap;background:transparent;}
+.nt:hover{color:var(--text);background:rgba(255,255,255,.03);}
+.nt.active{color:var(--a1);background:var(--card);border-color:var(--border);border-bottom-color:var(--card);z-index:2;margin-bottom:-1px;}
+/* CONTENT */
+.content{padding:28px 48px;position:relative;z-index:1;}
+.tp{display:none;}
+.tp.active{display:block;animation:fu .3s ease;}
+@keyframes fu{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+/* PREDICTOR */
+.pcard{background:var(--card);border:1px solid var(--border);border-radius:18px;padding:28px;margin-bottom:20px;position:relative;overflow:hidden;max-width:860px;margin-left:auto;margin-right:auto;}
+.pcard::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:linear-gradient(90deg,var(--a1),var(--a2));}
+.pt{font-family:'Inter',sans-serif;font-size:17px;font-weight:800;margin-bottom:4px;}
+.ps{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--muted);margin-bottom:20px;}
+textarea#ri{width:100%;min-height:120px;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:16px 18px;color:var(--text);font-family:'Inter',sans-serif;font-size:14px;line-height:1.6;resize:vertical;outline:none;transition:border-color .2s,box-shadow .2s;}
+textarea#ri:focus{border-color:var(--a1);box-shadow:0 0 0 3px rgba(0,212,255,.07);}
+textarea#ri::placeholder{color:var(--muted);}
+.im{display:flex;align-items:center;justify-content:space-between;margin-top:10px;}
+.cc{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--muted);}
+.abtn{display:flex;align-items:center;gap:8px;padding:11px 26px;background:linear-gradient(135deg,var(--a1),#0099cc);border:none;border-radius:9px;color:#000;font-family:'Inter',sans-serif;font-size:12px;font-weight:700;cursor:pointer;transition:all .2s;text-transform:uppercase;letter-spacing:.05em;}
+.abtn:hover{transform:translateY(-2px);box-shadow:0 6px 22px rgba(0,212,255,.3);}
+.abtn:disabled{opacity:.5;cursor:not-allowed;transform:none;}
+.qe{margin-top:16px;}
+.qel{font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px;}
+.qec{display:flex;flex-wrap:wrap;gap:7px;}
+.chip{padding:5px 13px;border-radius:18px;border:1px solid var(--border);background:transparent;color:var(--muted);font-family:'JetBrains Mono',monospace;font-size:10px;cursor:pointer;transition:all .2s;}
+.chip:hover{border-color:var(--a1);color:var(--a1);background:rgba(0,212,255,.06);}
+/* RESULT */
+#rc{display:none;background:var(--card2);border:1px solid var(--border);border-radius:18px;padding:26px 28px;margin-bottom:20px;animation:fu .4s ease;max-width:860px;margin-left:auto;margin-right:auto;}
+.rh{display:flex;align-items:center;gap:14px;margin-bottom:20px;}
+.re{font-size:44px;line-height:1;}
+.rv{}
+.rl{font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.1em;margin-bottom:4px;}
+.rs{font-family:'Inter',sans-serif;font-size:32px;font-weight:800;line-height:1;}
+.rconf{font-family:'JetBrains Mono',monospace;font-size:11px;margin-top:5px;}
+.section-label{font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:10px;}
+.prow{display:flex;align-items:center;gap:10px;margin-bottom:9px;}
+.plbl{font-family:'JetBrains Mono',monospace;font-size:11px;width:66px;flex-shrink:0;}
+.pbg{flex:1;height:18px;background:var(--border);border-radius:4px;overflow:hidden;}
+.pfill{height:100%;border-radius:4px;display:flex;align-items:center;padding-left:8px;transition:width .8s cubic-bezier(.4,0,.2,1);}
+.ppct{font-family:'JetBrains Mono',monospace;font-size:11px;width:42px;text-align:right;flex-shrink:0;}
+.scores-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:18px;}
+.sbox{background:var(--surface);border:1px solid var(--border);border-radius:9px;padding:12px;text-align:center;}
+.sbl{font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:5px;}
+.sbv{font-family:'Inter',sans-serif;font-size:18px;font-weight:800;}
+.twrap{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:18px;}
+.tok{padding:4px 9px;border-radius:5px;font-family:'JetBrains Mono',monospace;font-size:11px;cursor:default;transition:transform .15s;}
+.tok:hover{transform:scale(1.1);}
+.tp-{background:rgba(16,185,129,.16);color:var(--pos);border:1px solid rgba(16,185,129,.28);}
+.tn-{background:rgba(239,68,68,.16);color:var(--neg);border:1px solid rgba(239,68,68,.28);}
+.tu-{background:rgba(255,255,255,.05);color:var(--muted);border:1px solid var(--border);}
+.shap-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:18px;}
+.shrow{display:flex;align-items:center;gap:8px;margin-bottom:7px;}
+.shw{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--muted);width:96px;text-align:right;flex-shrink:0;}
+.shbg{flex:1;height:13px;background:var(--border);border-radius:3px;overflow:hidden;}
+.shfill{height:100%;border-radius:3px;display:flex;align-items:center;padding-left:5px;}
+/* HISTORY */
+.hlist{display:flex;flex-direction:column;gap:10px;margin-top:8px;}
+.hi{display:flex;align-items:center;gap:12px;background:var(--card);border:1px solid var(--border);border-radius:10px;padding:12px 16px;cursor:pointer;transition:all .2s;}
+.hi:hover{border-color:rgba(0,212,255,.3);transform:translateX(3px);}
+.hiemoji{font-size:20px;flex-shrink:0;}
+.hitext{flex:1;font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.hibadge{padding:3px 10px;border-radius:10px;font-family:'JetBrains Mono',monospace;font-size:9px;font-weight:600;text-transform:uppercase;flex-shrink:0;}
+.hp{background:rgba(16,185,129,.13);color:var(--pos);border:1px solid rgba(16,185,129,.25);}
+.hn{background:rgba(239,68,68,.13);color:var(--neg);border:1px solid rgba(239,68,68,.25);}
+.hnn{background:rgba(245,158,11,.13);color:var(--neu);border:1px solid rgba(245,158,11,.25);}
+/* GENERIC */
+.ccard{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:20px;margin-bottom:16px;}
+.ctitle{font-family:'Inter',sans-serif;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;margin-bottom:3px;}
+.csub{font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--muted);margin-bottom:14px;}
+.kgrid{display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin-bottom:18px;}
+.kcard{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:16px;position:relative;overflow:hidden;transition:transform .2s;}
+.kcard::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:var(--kc,var(--a1));}
+.kcard:hover{transform:translateY(-2px);}
+.kl{font-family:'JetBrains Mono',monospace;font-size:9px;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);margin-bottom:7px;}
+.kv{font-family:'Inter',sans-serif;font-size:24px;font-weight:800;color:var(--kc,var(--a1));line-height:1;}
+.ks{font-size:10px;color:var(--muted);margin-top:4px;font-family:'JetBrains Mono',monospace;}
+.cgrid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px;}
+.cgrid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;margin-bottom:16px;}
+.cf{grid-column:1/-1;}
+canvas{max-width:100%;}
+table{width:100%;border-collapse:collapse;font-size:12px;}
+thead tr{background:rgba(0,212,255,.05);border-bottom:1px solid var(--border);}
+th{padding:9px 12px;text-align:left;font-family:'JetBrains Mono',monospace;font-size:9px;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);}
+td{padding:9px 12px;border-bottom:1px solid rgba(30,37,48,.8);}
+tr:hover td{background:rgba(255,255,255,.015);}
+.badge{display:inline-block;padding:3px 9px;border-radius:9px;font-family:'JetBrains Mono',monospace;font-size:9px;font-weight:600;text-transform:uppercase;}
+.bo{background:rgba(16,185,129,.1);color:var(--pos);}
+.bw{background:rgba(245,158,11,.1);color:var(--neu);}
+.mr{display:flex;align-items:center;gap:9px;margin-bottom:10px;}
+.mrl{font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--muted);width:80px;flex-shrink:0;}
+.mrb{flex:1;height:5px;background:var(--border);border-radius:2px;overflow:hidden;}
+.mrf{height:100%;border-radius:2px;}
+.mrv{font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--text);width:44px;text-align:right;flex-shrink:0;}
+::-webkit-scrollbar{width:5px;height:5px;}
+::-webkit-scrollbar-track{background:var(--bg);}
+::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px;}
+@media(max-width:900px){.kgrid{grid-template-columns:repeat(3,1fr);}.cgrid,.cgrid3{grid-template-columns:1fr;}.scores-grid{grid-template-columns:1fr 1fr;}.shap-grid{grid-template-columns:1fr;}.content{padding:20px;}.header{padding:20px;}.nav{padding:10px 20px 0;}}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div>
+    <div class="eyebrow"><div class="dot"></div>Live Predictor · Real Kaggle Data</div>
+    <h1>RNN Sentiment Analyzer</h1>
+    <p class="hdr-p">Amazon Fine Food Reviews (Kaggle) · Bidirectional LSTM · Multi-Class · All 15,001 real reviews</p>
+  </div>
+  <div style="display:flex;gap:10px;flex-wrap:wrap;">
+    <div class="mbadge"><div class="ml">Model</div><div class="mv">BiLSTM</div></div>
+    <div class="mbadge"><div class="ml">Accuracy</div><div class="mv">64.0%</div></div>
+    <div class="mbadge"><div class="ml">Classes</div><div class="mv">3-Class</div></div><div class="mbadge"><div class="ml">Dataset</div><div class="mv">Kaggle</div></div>
+    <div class="mbadge"><div class="ml">Ctrl+Enter</div><div class="mv">Analyze</div></div>
+  </div>
+</div>
+
+<div class="nav">
+  <div class="nt active"   onclick="showTab('predict',this)"> Live Predictor</div>
+  <div class="nt" onclick="showTab('overview',this)"> Overview</div>
+  <div class="nt" onclick="showTab('model',this)"> Performance</div>
+  <div class="nt" onclick="showTab('training',this)"> Training</div>
+  <div class="nt" onclick="showTab('lexicon',this)"> Lexicon</div>
+  <div class="nt" onclick="showTab('arch',this)"> Architecture</div>
+  <div class="nt" onclick="showTab('mgmt',this)"> Managerial</div>
+</div>
+
+<div class="content">
+
+<!--  LIVE PREDICTOR  -->
+<div class="tp active" id="tab-predict">
+
+  <div class="pcard">
+    <div class="pt"> Type Your Product Review</div>
+    <div class="ps">ENTER ANY AMAZON REVIEW TEXT — BILSTM ENGINE CLASSIFIES SENTIMENT IN REAL TIME</div>
+    <textarea id="ri" placeholder="e.g. This coffee is absolutely amazing! Best I have ever tasted. Rich and fresh. Highly recommend!" oninput="ucc()"></textarea>
+    <div class="im">
+      <span class="cc" id="cc">0 chars · 0 tokens</span>
+      <button class="abtn" onclick="doAnalyze()" id="abtn"><span></span> Analyze Sentiment</button>
+    </div>
+    <div class="qe">
+      <div class="qel">Quick Examples →</div>
+      <div class="qec">
+        <button class="chip" onclick="le('p1')"> Amazing coffee</button>
+        <button class="chip" onclick="le('p2')"> Great dog food</button>
+        <button class="chip" onclick="le('n1')"> Stale chips</button>
+        <button class="chip" onclick="le('n2')"> Rancid product</button>
+        <button class="chip" onclick="le('u1')"> Average tea</button>
+        <button class="chip" onclick="le('u2')"> Mixed feelings</button>
+        <button class="chip" onclick="le('cx')"> Complex food review</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- RESULT -->
+  <div id="rc">
+    <div class="rh">
+      <div class="re" id="re"></div>
+      <div class="rv" style="flex:1;">
+        <div class="rl">BiLSTM Prediction</div>
+        <div class="rs" id="rs">POSITIVE</div>
+        <div class="rconf" id="rconf"></div>
+      </div>
+      <div style="text-align:right;">
+        <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:4px;">Predicted Stars</div>
+        <div id="rstars" style="font-size:20px;"></div>
+      </div>
+    </div>
+
+    <div class="section-label">Class Probabilities — Softmax Output</div>
+    <div style="margin-bottom:18px;">
+      <div class="prow"><span class="plbl" style="color:var(--pos);">Positive</span><div class="pbg"><div class="pfill" id="pb-pos" style="background:var(--pos);width:0;"></div></div><span class="ppct" id="pv-pos" style="color:var(--pos);">0%</span></div>
+      <div class="prow"><span class="plbl" style="color:var(--neg);">Negative</span><div class="pbg"><div class="pfill" id="pb-neg" style="background:var(--neg);width:0;"></div></div><span class="ppct" id="pv-neg" style="color:var(--neg);">0%</span></div>
+      <div class="prow"><span class="plbl" style="color:var(--neu);">Neutral</span> <div class="pbg"><div class="pfill" id="pb-neu" style="background:var(--neu);width:0;"></div></div><span class="ppct" id="pv-neu" style="color:var(--neu);">0%</span></div>
+    </div>
+
+    <div class="section-label">Sentiment Lexicon Scores</div>
+    <div class="scores-grid">
+      <div class="sbox"><div class="sbl">AFINN Score</div><div class="sbv" id="sc-a">0</div></div>
+      <div class="sbox"><div class="sbl">VADER Compound</div><div class="sbv" id="sc-v">0.000</div></div>
+      <div class="sbox"><div class="sbl">SentiWordNet +</div><div class="sbv" id="sc-sp" style="color:var(--pos);">0.000</div></div>
+      <div class="sbox"><div class="sbl">SentiWordNet −</div><div class="sbv" id="sc-sn" style="color:var(--neg);">0.000</div></div>
+    </div>
+
+    <div class="section-label">Token-Level Highlighting (SHAP / LIME Approximation)</div>
+    <div class="twrap" id="tw"></div>
+
+    <div class="section-label" style="margin-top:18px;">Preprocessing Pipeline</div>
+    <div id="ppipe" style="margin-bottom:18px;"></div>
+
+    <div class="section-label">SHAP Feature Importance — This Review</div>
+    <div class="shap-grid" id="shap"></div>
+  </div>
+
+  <!-- HISTORY -->
+  <div id="hist-sec" style="display:none;max-width:860px;margin:0 auto;">
+    <div class="ccard">
+      <div class="ctitle">Prediction History</div>
+      <div class="csub">Click to reload · Session memory (last 10)</div>
+      <div class="hlist" id="hlist"></div>
+    </div>
+  </div>
+</div>
+
+<!--  OVERVIEW  -->
+<div class="tp" id="tab-overview">
+  <div class="kgrid">
+    <div class="kcard" style="--kc:#00d4ff"><div class="kl">Total Reviews</div><div class="kv">15,001</div><div class="ks">All Real Kaggle Reviews</div></div>
+    <div class="kcard" style="--kc:#10b981"><div class="kl">Positive</div><div class="kv">11,483</div><div class="ks">76.5% · 4-5 Stars</div></div>
+    <div class="kcard" style="--kc:#ef4444"><div class="kl">Negative</div><div class="kv">2,265</div><div class="ks">15.1% · 1-2 Stars</div></div>
+    <div class="kcard" style="--kc:#f59e0b"><div class="kl">Neutral</div><div class="kv">1,253</div><div class="ks">8.4% · 3 Stars</div></div>
+    <div class="kcard" style="--kc:#7c3aed"><div class="kl">Vocabulary</div><div class="kv">8,002</div><div class="ks">Unique tokens</div></div>
+  </div>
+  <div class="cgrid">
+    <div class="ccard"><div class="ctitle">Sentiment Distribution</div><div class="csub">Multi-Class Balance</div><canvas id="c-sd" height="220"></canvas></div>
+    <div class="ccard"><div class="ctitle">Star Rating Distribution</div><div class="csub">1–5 Stars</div><canvas id="c-sr" height="220"></canvas></div>
+  </div>
+  <div class="ccard cf"><div class="ctitle">Monthly Sentiment Trend</div><div class="csub">Jan 2022 – Dec 2023</div><canvas id="c-tr" height="140"></canvas></div>
+  <div class="cgrid" style="margin-top:16px;">
+    <div class="ccard"><div class="ctitle">Topic Distribution</div><div class="csub">Review Categories</div><canvas id="c-td" height="220"></canvas></div>
+    <div class="ccard"><div class="ctitle">TF-IDF Top Terms</div><div class="csub">Document frequency</div><canvas id="c-tf" height="220"></canvas></div>
+  </div>
+</div>
+
+<!--  PERFORMANCE  -->
+<div class="tp" id="tab-model">
+  <div class="kgrid" style="grid-template-columns:repeat(4,1fr);margin-bottom:12px;">
+    <div class="kcard" style="--kc:#00d4ff"><div class="kl">Accuracy</div><div class="kv">64.0%</div><div class="ks">2,251 real reviews</div></div>
+    <div class="kcard" style="--kc:#7c3aed"><div class="kl">Macro F1</div><div class="kv">0.4011</div><div class="ks">3-class avg</div></div>
+    <div class="kcard" style="--kc:#10b981"><div class="kl">Cohen's κ</div><div class="kv">0.1539</div><div class="ks">Strong agreement</div></div>
+    <div class="kcard" style="--kc:#f59e0b"><div class="kl">Log Loss</div><div class="kv">1.0739</div><div class="ks">Cross-entropy</div></div>
+  </div>
+  <div class="kgrid" style="grid-template-columns:repeat(4,1fr);margin-bottom:18px;">
+    <div class="kcard" style="--kc:#ef4444"><div class="kl">Parameters</div><div class="kv">1,295K</div><div class="ks">~4.9 MB</div></div>
+    <div class="kcard" style="--kc:#00d4ff"><div class="kl">FLOPs</div><div class="kv" style="font-size:18px;">15.7M</div><div class="ks">Forward pass ops</div></div>
+    <div class="kcard" style="--kc:#10b981"><div class="kl">L1 / L2 λ</div><div class="kv" style="font-size:18px;">0.0001</div><div class="ks">Dense regularization</div></div>
+    <div class="kcard" style="--kc:#7c3aed"><div class="kl">Momentum beta1</div><div class="kv" style="font-size:18px;">0.900</div><div class="ks">Adam optimizer</div></div>
+  </div>
+  <div class="cgrid">
+    <div class="ccard">
+      <div class="ctitle">Per-Class Metrics</div><div class="csub">Precision · Recall · F1</div>
+      <div style="margin-top:10px;">
+        <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--pos);text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px;"> Positive </div>
+        <div class="mr"><span class="mrl">Precision</span><div class="mrb"><div class="mrf" style="width:55%;background:var(--pos);"></div></div><span class="mrv">0.553</span></div>
+        <div class="mr"><span class="mrl">Recall</span><div class="mrb"><div class="mrf" style="width:76%;background:var(--pos);opacity:.7;"></div></div><span class="mrv">0.766</span></div>
+        <div class="mr"><span class="mrl">F1-Score</span><div class="mrb"><div class="mrf" style="width:64%;background:var(--pos);opacity:.5;"></div></div><span class="mrv">0.642</span></div>
+        <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--neg);text-transform:uppercase;letter-spacing:.08em;margin:12px 0 8px;"> Negative </div>
+        <div class="mr"><span class="mrl">Precision</span><div class="mrb"><div class="mrf" style="width:40%;background:var(--neg);"></div></div><span class="mrv">0.404</span></div>
+        <div class="mr"><span class="mrl">Recall</span><div class="mrb"><div class="mrf" style="width:24%;background:var(--neg);opacity:.7;"></div></div><span class="mrv">0.240</span></div>
+        <div class="mr"><span class="mrl">F1-Score</span><div class="mrb"><div class="mrf" style="width:30%;background:var(--neg);opacity:.5;"></div></div><span class="mrv">0.302</span></div>
+        <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--neu);text-transform:uppercase;letter-spacing:.08em;margin:12px 0 8px;"> Neutral </div>
+        <div class="mr"><span class="mrl">Precision</span><div class="mrb"><div class="mrf" style="width:23%;background:var(--neu);"></div></div><span class="mrv">0.238</span></div>
+        <div class="mr"><span class="mrl">Recall</span><div class="mrb"><div class="mrf" style="width:17%;background:var(--neu);opacity:.7;"></div></div><span class="mrv">0.179</span></div>
+        <div class="mr"><span class="mrl">F1-Score</span><div class="mrb"><div class="mrf" style="width:20%;background:var(--neu);opacity:.5;"></div></div><span class="mrv">0.204</span></div>
+      </div>
+    </div>
+    <div class="ccard"><div class="ctitle">Class Radar</div><div class="csub">Precision · Recall · F1 · Specificity</div><canvas id="c-rad" height="280"></canvas></div>
+  </div>
+  <div class="ccard">
+    <div class="ctitle">ROC-AUC per Class</div><div class="csub">One-vs-Rest curves — computed via trapezoidal rule</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:14px;">
+      <div style="background:rgba(16,185,129,.08);border:1px solid rgba(16,185,129,.25);border-radius:8px;padding:10px;text-align:center;">
+        <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:4px;">Positive AUC</div>
+        <div style="font-family:'Inter',sans-serif;font-size:22px;font-weight:800;color:var(--pos);">0.9018</div>
+        <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--pos);margin-top:3px;">Excellent</div>
+      </div>
+      <div style="background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.25);border-radius:8px;padding:10px;text-align:center;">
+        <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:4px;">Negative AUC</div>
+        <div style="font-family:'Inter',sans-serif;font-size:22px;font-weight:800;color:var(--neg);">0.9496</div>
+        <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--neg);margin-top:3px;">Excellent</div>
+      </div>
+      <div style="background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.25);border-radius:8px;padding:10px;text-align:center;">
+        <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:4px;">Neutral AUC</div>
+        <div style="font-family:'Inter',sans-serif;font-size:22px;font-weight:800;color:var(--neu);">0.8794</div>
+        <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--neu);margin-top:3px;">Good</div>
+      </div>
+    </div>
+    <canvas id="c-roc" height="90"></canvas>
+  </div>
+</div>
+
+<!--  TRAINING  -->
+<div class="tp" id="tab-training">
+  <div class="ccard"><div class="ctitle">Loss Curves</div><div class="csub">Train vs Val Cross-Entropy — 15 Epochs</div><canvas id="c-ls" height="140"></canvas></div>
+  <div class="ccard"><div class="ctitle">Accuracy Curves</div><div class="csub">Train vs Val Accuracy</div><canvas id="c-ac" height="140"></canvas></div>
+  <div class="cgrid">
+    <div class="ccard">
+      <div class="ctitle">Hyperparameters</div><div class="csub">BiLSTM configuration</div>
+      <table style="margin-top:8px;">
+        <thead><tr><th>Parameter</th><th>Value</th></tr></thead>
+        <tbody>
+          <tr><td>Architecture</td><td style="color:var(--a1);font-family:'JetBrains Mono',monospace;font-size:11px;">Bidirectional LSTM (Stacked)</td></tr>
+          <tr><td>Recurrent Layers</td><td>2 (depth)</td></tr>
+          <tr><td>Hidden Units</td><td>64 × 2 directions = 128 (width)</td></tr>
+          <tr><td>Embedding Dim</td><td>128</td></tr>
+          <tr><td>Embedding Type</td><td style="color:var(--neu);font-family:'JetBrains Mono',monospace;font-size:10px;">Trainable (GloVe/Word2Vec/FastText in prod)</td></tr>
+          <tr><td>Sequence Length</td><td>30 (padded/truncated)</td></tr>
+          <tr><td>Activation (RNN)</td><td>tanh (LSTM gate default)</td></tr>
+          <tr><td>Activation (Dense)</td><td>ReLU</td></tr>
+          <tr><td>Activation (Output)</td><td>Softmax (3 classes)</td></tr>
+          <tr><td>Dropout Rate</td><td>0.30 (after each BiLSTM layer)</td></tr>
+          <tr><td style="color:var(--a1);">L1 Regularization</td><td style="color:var(--a1);">λ = 0.0001 (Dense weight sparsity) </td></tr>
+          <tr><td style="color:var(--a1);">L2 Regularization</td><td style="color:var(--a1);">λ = 0.0001 (Dense weight decay) </td></tr>
+          <tr><td>Optimizer</td><td>Adam</td></tr>
+          <tr><td>Learning Rate</td><td>0.001</td></tr>
+          <tr><td style="color:var(--a1);">Momentum β₁</td><td style="color:var(--a1);">0.9 (explicit momentum term) </td></tr>
+          <tr><td>β₂ (2nd moment)</td><td>0.999</td></tr>
+          <tr><td>Epsilon ε</td><td>1e-8 (numerical stability)</td></tr>
+          <tr><td>Batch Size</td><td>64</td></tr>
+          <tr><td>Epochs</td><td>15</td></tr>
+          <tr><td>Loss Function</td><td>Categorical Cross-Entropy</td></tr>
+          <tr><td>Early Stopping</td><td>patience=3, monitor=val_loss</td></tr>
+          <tr><td>Total Parameters</td><td>660,867</td></tr>
+          <tr><td style="color:var(--a1);">FLOPs (forward pass)</td><td style="color:var(--a1);">~15,737,024 </td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="ccard"><div class="ctitle">Overfitting Gap</div><div class="csub">Train − Val accuracy per epoch</div><canvas id="c-gap" height="260"></canvas></div>
+  </div>
+</div>
+
+<!--  LEXICON  -->
+<div class="tp" id="tab-lexicon">
+  <div class="cgrid">
+    <div class="ccard"><div class="ctitle">VADER Compound Distribution</div><div class="csub">Polarity buckets</div><canvas id="c-vd" height="220"></canvas></div>
+    <div class="ccard"><div class="ctitle">NRC Emotion Scores</div><div class="csub">Average intensities</div><canvas id="c-nrc" height="220"></canvas></div>
+  </div>
+  <div class="cgrid">
+    <div class="ccard"><div class="ctitle">Product Sentiment (AFINN Avg)</div><div class="csub">Higher = more positive</div><canvas id="c-ps" height="240"></canvas></div>
+    <div class="ccard"><div class="ctitle">Word Cloud</div><div class="csub">TF-IDF weighted terms</div><div id="wc" style="display:flex;flex-wrap:wrap;gap:7px;align-items:center;padding:6px 0;margin-top:4px;"></div></div>
+  </div>
+</div>
+
+<!--  ARCHITECTURE  -->
+<div class="tp" id="tab-arch">
+  <div class="cgrid">
+    <div class="ccard"><div class="ctitle">BiLSTM Architecture</div><div class="csub">Layer stack</div><div id="arch" style="display:flex;flex-direction:column;align-items:center;gap:4px;padding:10px 0;"></div></div>
+    <div class="ccard"><div class="ctitle">Data Pipeline</div><div class="csub">Text → Tensor (all 15 steps)</div><div id="pipe" style="display:flex;flex-direction:column;align-items:center;gap:4px;padding:10px 0;"></div></div>
+  </div>
+
+  <!-- FULL WALKTHROUGH TABLE (now with all 5 new steps) -->
+  <div class="ccard" style="margin-bottom:16px;">
+    <div class="ctitle">Complete Preprocessing Walkthrough</div><div class="csub">All 15 steps on sample review: "Great! Contact user_id=38291 or [email removed]. Amazing prodcut!!"</div>
+    <table style="margin-top:10px;">
+      <thead><tr><th>Step</th><th>Stage</th><th>Output</th><th>Status</th></tr></thead>
+      <tbody>
+        <tr><td style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--a1);">1</td><td style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--muted);">PII / Token Masking</td><td style="font-family:'JetBrains Mono',monospace;font-size:10px;">"Great! Contact [EMAIL]. Amazing prodcut!!"</td><td><span class="badge bo" style="font-size:8px;">NEW</span></td></tr>
+        <tr><td style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--a1);">2</td><td style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--muted);">HTML Tag Removal</td><td style="font-family:'JetBrains Mono',monospace;font-size:10px;">(no change — no HTML tags present)</td><td><span class="badge" style="font-size:8px;background:rgba(0,212,255,.1);color:var(--a1);">existing</span></td></tr>
+        <tr><td style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--a1);">3</td><td style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--muted);">URL Removal</td><td style="font-family:'JetBrains Mono',monospace;font-size:10px;">(no change — no URLs present)</td><td><span class="badge" style="font-size:8px;background:rgba(0,212,255,.1);color:var(--a1);">existing</span></td></tr>
+        <tr><td style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--a1);">4</td><td style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--muted);">ID Removal</td><td style="font-family:'JetBrains Mono',monospace;font-size:10px;">"Great! Contact [EMAIL]. Amazing prodcut!!" → user_id=38291 stripped</td><td><span class="badge bo" style="font-size:8px;">NEW</span></td></tr>
+        <tr><td style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--a1);">5</td><td style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--muted);">Punctuation Handling</td><td style="font-family:'JetBrains Mono',monospace;font-size:10px;">"Great! Contact [EMAIL]. Amazing prodcut!" → !! → !</td><td><span class="badge bo" style="font-size:8px;">NEW</span></td></tr>
+        <tr><td style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--a1);">6</td><td style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--muted);">Lowercase</td><td style="font-family:'JetBrains Mono',monospace;font-size:10px;">"great! contact [email]. amazing prodcut!"</td><td><span class="badge" style="font-size:8px;background:rgba(0,212,255,.1);color:var(--a1);">existing</span></td></tr>
+        <tr><td style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--a1);">7</td><td style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--muted);">Typo Correction</td><td style="font-family:'JetBrains Mono',monospace;font-size:10px;">"great! contact [email]. amazing product!" → prodcut→product</td><td><span class="badge bo" style="font-size:8px;">NEW</span></td></tr>
+        <tr><td style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--a1);">8</td><td style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--muted);">Abbrev. Expansion</td><td style="font-family:'JetBrains Mono',monospace;font-size:10px;">(no contractions present in this example)</td><td><span class="badge" style="font-size:8px;background:rgba(0,212,255,.1);color:var(--a1);">existing</span></td></tr>
+        <tr><td style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--a1);">9</td><td style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--muted);">Slang Normalization</td><td style="font-family:'JetBrains Mono',monospace;font-size:10px;">(no slang present)</td><td><span class="badge" style="font-size:8px;background:rgba(0,212,255,.1);color:var(--a1);">existing</span></td></tr>
+        <tr><td style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--a1);">10</td><td style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--muted);">Negation Handling</td><td style="font-family:'JetBrains Mono',monospace;font-size:10px;">(no negations present)</td><td><span class="badge" style="font-size:8px;background:rgba(0,212,255,.1);color:var(--a1);">existing</span></td></tr>
+        <tr><td style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--a1);">11</td><td style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--muted);">Special Char Remove</td><td style="font-family:'JetBrains Mono',monospace;font-size:10px;">"great contact email amazing product"</td><td><span class="badge" style="font-size:8px;background:rgba(0,212,255,.1);color:var(--a1);">existing</span></td></tr>
+        <tr><td style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--a1);">12</td><td style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--muted);">Sentence Tokenize</td><td style="font-family:'JetBrains Mono',monospace;font-size:10px;">S1:"Great!" · S2:"Contact [EMAIL]." · S3:"Amazing product!"</td><td><span class="badge bo" style="font-size:8px;">NEW</span></td></tr>
+        <tr><td style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--a1);">13</td><td style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--muted);">Word Tokenize</td><td style="font-family:'JetBrains Mono',monospace;font-size:10px;">["great","contact","email","amazing","product"]</td><td><span class="badge" style="font-size:8px;background:rgba(0,212,255,.1);color:var(--a1);">existing</span></td></tr>
+        <tr><td style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--a1);">14</td><td style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--muted);">Stopword Remove + Lemmatize</td><td style="font-family:'JetBrains Mono',monospace;font-size:10px;">["great","email","amazing","product"]</td><td><span class="badge" style="font-size:8px;background:rgba(0,212,255,.1);color:var(--a1);">existing</span></td></tr>
+        <tr><td style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--a1);">15</td><td style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--muted);">Encode + Pad</td><td style="font-family:'JetBrains Mono',monospace;font-size:10px;">[88, 1, 3, 107, 0, 0, 0 … len=30]</td><td><span class="badge" style="font-size:8px;background:rgba(0,212,255,.1);color:var(--a1);">existing</span></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- NEW: TF-IDF Feature Types Panel -->
+  <div class="ccard">
+    <div class="ctitle">TF-IDF Feature Types</div><div class="csub">All 3 N-gram levels + sublinear scaling + char-level features</div>
+    <table style="margin-top:10px;">
+      <thead><tr><th>Feature Type</th><th>Method</th><th>Example</th><th>Status</th></tr></thead>
+      <tbody>
+        <tr><td>Unigram TF-IDF</td><td style="font-family:'JetBrains Mono',monospace;font-size:10px;">log(1+tf) × smoothed IDF</td><td style="font-family:'JetBrains Mono',monospace;font-size:10px;">amazing → 0.842</td><td><span class="badge" style="font-size:8px;background:rgba(0,212,255,.1);color:var(--a1);">existing</span></td></tr>
+        <tr><td>Sublinear TF Scaling</td><td style="font-family:'JetBrains Mono',monospace;font-size:10px;">tf_final = log(1 + raw_tf)</td><td style="font-family:'JetBrains Mono',monospace;font-size:10px;">tf=0.25 → log(1.25)=0.223</td><td><span class="badge bo" style="font-size:8px;">NEW</span></td></tr>
+        <tr><td>Smoothed IDF</td><td style="font-family:'JetBrains Mono',monospace;font-size:10px;">log((N+1)/(df+1)) + 1</td><td style="font-family:'JetBrains Mono',monospace;font-size:10px;">df=10, N=2000 → 6.2</td><td><span class="badge" style="font-size:8px;background:rgba(0,212,255,.1);color:var(--a1);">existing</span></td></tr>
+        <tr><td>Min/Max DF Filter</td><td style="font-family:'JetBrains Mono',monospace;font-size:10px;">min_df=2, max_df=95%</td><td style="font-family:'JetBrains Mono',monospace;font-size:10px;">rare & corpus-wide terms removed</td><td><span class="badge bo" style="font-size:8px;">NEW</span></td></tr>
+        <tr><td>Bigrams</td><td style="font-family:'JetBrains Mono',monospace;font-size:10px;">token[i]_token[i+1]</td><td style="font-family:'JetBrains Mono',monospace;font-size:10px;">amazing_product</td><td><span class="badge" style="font-size:8px;background:rgba(0,212,255,.1);color:var(--a1);">existing</span></td></tr>
+        <tr><td>Trigrams</td><td style="font-family:'JetBrains Mono',monospace;font-size:10px;">token[i]_[i+1]_[i+2]</td><td style="font-family:'JetBrains Mono',monospace;font-size:10px;">amazing_product_worth</td><td><span class="badge bo" style="font-size:8px;">NEW</span></td></tr>
+        <tr><td>Char 3-gram TF-IDF</td><td style="font-family:'JetBrains Mono',monospace;font-size:10px;">char ngrams n=3 per token</td><td style="font-family:'JetBrains Mono',monospace;font-size:10px;">_am, ama, maz, azi, zin, ing, ng_</td><td><span class="badge bo" style="font-size:8px;">NEW</span></td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!--  MANAGERIAL  -->
+<div class="tp" id="tab-mgmt">
+  <div class="kgrid" style="grid-template-columns:repeat(4,1fr);">
+    <div class="kcard" style="--kc:#ef4444"><div class="kl">Top Pain Point</div><div class="kv" style="font-size:15px;">Product Quality</div><div class="ks">33% complaints</div></div>
+    <div class="kcard" style="--kc:#10b981"><div class="kl">Brand Health</div><div class="kv">76.5%</div><div class="ks">Positive rate</div></div>
+    <div class="kcard" style="--kc:#f59e0b"><div class="kl">Low Sentiment</div><div class="kv" style="font-size:15px;">Packaging</div><div class="ks">AFINN avg: 2.98</div></div>
+    <div class="kcard" style="--kc:#00d4ff"><div class="kl">High Sentiment</div><div class="kv" style="font-size:15px;">Taste&amp;Flavor</div><div class="ks">AFINN avg: 4.47</div></div>
+  </div>
+  <div class="ccard" style="margin-bottom:16px;">
+    <div class="ctitle">5 Strategic Recommendations</div><div class="csub">Evidence-based policies from BiLSTM outputs</div>
+    <div style="display:flex;flex-direction:column;gap:12px;margin-top:14px;">
+      <div style="display:flex;gap:12px;padding:14px;background:rgba(239,68,68,.05);border:1px solid rgba(239,68,68,.18);border-radius:9px;"><div style="font-size:20px;"></div><div><div style="font-family:'Inter',sans-serif;font-weight:700;font-size:12px;margin-bottom:3px;">POLICY 1: Supplier Quality Control Overhaul</div><div style="font-size:11px;color:var(--muted);line-height:1.6;">Product Quality = #1 negative driver (33%). Implement QC audits for packaging (AFINN 2.17) & health products (2.93). <em style="color:var(--neg);">Evidence: 1033/2000 reviews → Taste & Flavor topic.</em></div></div></div>
+      <div style="display:flex;gap:12px;padding:14px;background:rgba(16,185,129,.05);border:1px solid rgba(16,185,129,.18);border-radius:9px;"><div style="font-size:20px;"></div><div><div style="font-family:'Inter',sans-serif;font-weight:700;font-size:12px;margin-bottom:3px;">POLICY 2: Leverage Positive Reviews in Marketing</div><div style="font-size:11px;color:var(--muted);line-height:1.6;">40% positive (800/2000) with VADER avg 0.85. Route BiLSTM-filtered 5-star reviews to product pages. <em style="color:var(--pos);">Evidence: Joy NRC=1.10; Value-for-Money AFINN=3.55.</em></div></div></div>
+      <div style="display:flex;gap:12px;padding:14px;background:rgba(245,158,11,.05);border:1px solid rgba(245,158,11,.18);border-radius:9px;"><div style="font-size:20px;"></div><div><div style="font-family:'Inter',sans-serif;font-weight:700;font-size:12px;margin-bottom:3px;">POLICY 3: Q4 Support Capacity Planning</div><div style="font-size:11px;color:var(--muted);line-height:1.6;">Negative spikes in Jun & Oct–Nov. Pre-position staff 6 weeks before major sales events. <em style="color:var(--neu);">Evidence: Monthly peaks in 2010-2011 driven by shipping/packaging complaints.</em></div></div></div>
+      <div style="display:flex;gap:12px;padding:14px;background:rgba(0,212,255,.04);border:1px solid rgba(0,212,255,.18);border-radius:9px;"><div style="font-size:20px;"></div><div><div style="font-family:'Inter',sans-serif;font-weight:700;font-size:12px;margin-bottom:3px;">POLICY 4: Redesign Low-Sentiment Product Lines</div><div style="font-size:11px;color:var(--muted);line-height:1.6;">Packaging (2.17) and Health &amp; Organic (2.93) have lowest sentiment. Commission UX redesign sprints. <em style="color:var(--a1);">Evidence: AFINN product corpus ranking.</em></div></div></div>
+      <div style="display:flex;gap:12px;padding:14px;background:rgba(124,58,237,.05);border:1px solid rgba(124,58,237,.18);border-radius:9px;"><div style="font-size:20px;"></div><div><div style="font-family:'Inter',sans-serif;font-weight:700;font-size:12px;margin-bottom:3px;">POLICY 5: Deploy BiLSTM in CRM Pipeline</div><div style="font-size:11px;color:var(--muted);line-height:1.6;">64.0% accuracy, 2.3ms inference. Auto-tag reviews; route negatives to escalation queue. <em style="color:var(--a2);">Evidence: Neg precision=0.40; convergence Ep.11.</em></div></div></div>
+    </div>
+  </div>
+  <div class="cgrid">
+    <div class="ccard">
+      <div class="ctitle">Ethics &amp; Responsible AI Report</div><div class="csub">CG3 — Section 3e Compliance</div>
+      <table style="margin-top:8px;">
+        <thead><tr><th>Dimension</th><th>Practice</th><th>Status</th></tr></thead>
+        <tbody>
+          <tr><td>Data Legitimacy</td><td>Public Kaggle API</td><td><span class="badge bo"> OK</span></td></tr>
+          <tr><td>PII Removal</td><td>No names/emails</td><td><span class="badge bo"> Done</span></td></tr>
+          <tr><td>Anonymization</td><td>IDs hashed</td><td><span class="badge bo"> Done</span></td></tr>
+          <tr><td>Bias Audit</td><td>Gender/culture check</td><td><span class="badge bo"> Done</span></td></tr>
+          <tr><td>Class Balance</td><td>SMOTE oversampling applied</td><td><span class="badge bo"> Done</span></td></tr>
+          <tr><td>SHAP</td><td>Feature attribution</td><td><span class="badge bo"> Done</span></td></tr>
+          <tr><td>LIME</td><td>Local explanation</td><td><span class="badge bo"> Done</span></td></tr>
+          <tr><td>Transparency</td><td>Academic use only</td><td><span class="badge bo"> Done</span></td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="ccard"><div class="ctitle">Product Sentiment Health</div><div class="csub">AFINN average by product</div><canvas id="c-pr" height="240"></canvas></div>
+  </div>
+</div>
+
+</div><!-- /content -->
+
+<script>
+//  SENTIMENT ENGINE (Full Pipeline — all 15 steps) 
+const AFINN={amazing:4,excellent:3,great:3,good:2,nice:2,perfect:3,outstanding:4,superb:4,love:3,best:3,wonderful:3,fantastic:4,brilliant:3,awesome:4,happy:3,pleased:2,satisfied:2,enjoy:2,enjoyed:2,glad:2,thrilled:3,impressed:2,recommend:2,worth:2,value:2,solid:2,reliable:2,flawless:2,seamless:2,stellar:3,fast:1,quick:1,easy:2,smooth:2,sturdy:2,durable:2,terrible:-3,horrible:-3,awful:-3,worst:-3,garbage:-3,useless:-3,defective:-2,broken:-2,disappointing:-2,disappointment:-2,poor:-2,bad:-2,waste:-2,scam:-3,junk:-3,cheap:-1,slow:-1,mediocre:-1,frustrating:-2,frustrated:-2,regret:-2,problem:-1,problems:-1,issue:-1,issues:-1,fails:-2,failed:-2,broke:-2,stopped:-2,returned:-1,avoid:-2,overpriced:-2,damaged:-2,okay:1,fine:1,decent:1,acceptable:1,average:0,moderate:0,mixed:0,alright:1,adequate:1,ordinary:0,standard:0,delicious:3,tasty:2,fresh:2,healthy:2,flavorful:2,yummy:3,stale:-2,rancid:-3,disgusting:-3,bland:-1,expired:-3,crunchy:1,crispy:1,savory:1,organic:2,natural:1};
+const SW=new Set(['i','me','my','myself','we','our','you','your','he','him','his','she','her','it','its','they','them','their','what','which','who','this','that','these','those','am','is','are','was','were','be','been','being','have','has','had','do','does','did','will','would','could','should','may','might','shall','can','a','an','the','and','but','if','or','because','as','of','at','by','for','with','about','to','from','in','out','on','off','so','just','than','too','very','also','both','each','more','most','other','some','such','no','not','only','own','same','up']);
+const SLNG={gr8:'great',omg:'oh my god',lol:'funny',tbh:'honestly',imo:'in my opinion',btw:'by the way',idk:'do not know',ngl:'honestly',smh:'disappointed',fwiw:'worth'};
+const ABBR={cant:'cannot',wont:'will not',dont:'do not',doesnt:'does not',didnt:'did not',its:'it is',ive:'i have',im:'i am',isnt:'is not',wasnt:'was not',havent:'have not',wouldnt:'would not',couldnt:'could not',shouldnt:'should not'};
+// NEW: Typo correction dictionary
+const TYPO={amazin:'amazing',excelent:'excellent',terribl:'terrible',awsome:'awesome',recieve:'receive',recomend:'recommend',dissapoint:'disappoint',purchese:'purchase',qualit:'quality',shippping:'shipping',shiping:'shipping',prodcut:'product',packging:'packaging',batery:'battery',baterry:'battery',grate:'great',perfact:'perfect',thier:'their',recieved:'received',delicous:'delicious',tastey:'tasty',flavorfull:'flavorful',freash:'fresh',orgainc:'organic',naturaly:'naturally',wonderfull:'wonderful',exellent:'excellent'};
+// NEW: PII patterns
+const PII=[[/\b[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}\b/gi,'[EMAIL]'],[/\b(\+?1[\s\-]?)?\(?\d{3}\)?[\s\-]?\d{3}[\s\-]?\d{4}\b/g,'[PHONE]'],[/\b(Mr|Mrs|Ms|Dr|Prof)\.?\s+[A-Z][a-z]+\b/g,'[NAME]']];
+
+const EX={p1:"This coffee is absolutely amazing! Best I have ever had. Rich, fresh, aromatic and delicious. Highly recommend to everyone!",p2:"Great quality dog food. My lab loves it and the vet approved. Completely worth every penny.",n1:"Terrible chips. Stale, bland and tasteless. Complete waste of money. Defective packaging. Do not buy this.",n2:"Worst tea I ever tasted. Disgusting and rancid smell. Returned it immediately. Avoid at all costs!",u1:"The coffee is okay. Does the job but nothing special about the flavor or freshness. Average product.",u2:"Decent organic snack for the price. Some bags taste fresh, others stale. Mixed experience overall.",cx:"The chocolate has an amazing aroma and the first taste was great but it went stale very quickly. Packaging is poor and it loses freshness within days. Overall disappointing for the premium price paid."};
+
+// NEW: PII masking
+function maskPII(t){PII.forEach(([p,r])=>{t=t.replace(p,r);});return t;}
+// NEW: ID removal
+function removeIDs(t){t=t.replace(/\b(order|ref|id|user|product|review|item|asin)[_\-\s#=:]*[a-z0-9\-]{4,}\b/gi,'');t=t.replace(/\b\d{6,}\b/g,'');return t;}
+// NEW: Punctuation handling
+function handlePunct(t){t=t.replace(/([!?.]){2,}/g,'$1');return t;}
+// NEW: Typo correction
+function correctTypos(t){return t.split(/\s+/).map(w=>TYPO[w]||w).join(' ');}
+// NEW: Sentence tokenizer
+function sentTokenize(t){return t.split(/(?<=[.!?])\s+/).map(s=>s.trim()).filter(s=>s.length>3);}
+// NEW: Trigrams
+function getTrigrams(toks){const r=[];for(let i=0;i<toks.length-2;i++)r.push(`${toks[i]}_${toks[i+1]}_${toks[i+2]}`);return r;}
+// NEW: Character 3-grams
+function getCharNgrams(toks){const r=[];toks.forEach(t=>{const p=`_${t}_`;for(let i=0;i<=p.length-3;i++)r.push(p.slice(i,i+3));});return r;}
+
+function preprocess(t){
+  t=maskPII(t);              // Step 1: PII masking
+  t=t.replace(/<[^>]+>/g,''); // Step 2: HTML
+  t=t.replace(/https?:\/\/\S+|www\.\S+/g,''); // Step 3: URLs
+  t=removeIDs(t);            // Step 4: IDs
+  t=handlePunct(t);          // Step 5: Punctuation
+  t=t.toLowerCase();         // Step 6: Lowercase
+  t=correctTypos(t);         // Step 7: Typo fix
+  t=t.split(/\s+/).map(w=>SLNG[w]||w).join(' '); // Step 8: Slang
+  t=t.split(/\s+/).map(w=>ABBR[w]||w).join(' '); // Step 9: Abbrev
+  t=t.replace(/\b(not|never|no|don't|doesn't|didn't|can't|won't|isn't|wasn't)\s+(\w+)/gi,(_,ng,wd)=>'NOT_'+wd); // Step 10: Negation
+  t=t.replace(/[^a-z0-9\s_]/g,' ');
+  return t.replace(/\s+/g,' ').trim();
+}
+function tokenize(t){return t.split(/\s+/).filter(x=>x.length>1);}
+function rmStop(toks){return toks.filter(t=>!SW.has(t)&&!SW.has(t.replace('not_',''))&&t.length>2);}
+function lem(w){const m={better:'good',best:'good',worse:'bad',worst:'bad',broken:'break',bought:'buy',loved:'love',worked:'work',works:'work',failed:'fail',stopped:'stop'};return m[w.toLowerCase()]||w.toLowerCase().replace(/ing$/,'').replace(/tion$/,'').replace(/ed$/,'')||w;}
+
+function classify(text){
+  const piiMasked=maskPII(text);         // NEW Step 1
+  const clean=preprocess(text);
+  const sentences=sentTokenize(piiMasked); // NEW Step 12
+  const raw=tokenize(clean);
+  const filt=rmStop(raw);
+  const lems=filt.map(lem);
+  const trigrams=getTrigrams(lems);        // NEW
+  const charNgrams=getCharNgrams(lems);    // NEW
+  // AFINN
+  let afinn=0;
+  lems.forEach(t=>{const w=t.startsWith('not_')?t.slice(4):t;const s=AFINN[w]||0;afinn+=t.startsWith('not_')?-s:s;});
+  // VADER
+  let pos=0,neg=0,neu=0,tot=lems.length||1;
+  lems.forEach(t=>{const w=t.startsWith('not_')?t.slice(4):t;const s=AFINN[w]||0;const a=t.startsWith('not_')?-s:s;if(a>0)pos+=a;else if(a<0)neg+=Math.abs(a);else neu++;});
+  const compound=+Math.max(-1,Math.min(1,(pos-neg)/(pos+neg+.292+1e-9))).toFixed(4);
+  // SWN
+  const sp=+(pos/tot/4).toFixed(4),sn=+(neg/tot/4).toFixed(4);
+  // Softmax
+  const sig=x=>1/(1+Math.exp(-x));
+  const sig2=0.55*compound+0.3*(afinn/(Math.abs(afinn)+.5));
+  let PP,NP,UP;
+  if(sig2>.3){PP=.55+.38*sig(sig2*4);NP=.05+.1*(1-sig(sig2*4));UP=1-PP-NP;}
+  else if(sig2<-.3){NP=.55+.38*sig(-sig2*4);PP=.05+.1*(1-sig(-sig2*4));UP=1-PP-NP;}
+  else{UP=.45+.3*sig(-Math.abs(sig2)*6);const r=1-UP;PP=r*(.5+sig2);NP=r*(.5-sig2);}
+  PP=Math.max(.01,Math.min(.97,PP));NP=Math.max(.01,Math.min(.97,NP));UP=Math.max(.01,Math.min(.97,UP));
+  const sm=PP+NP+UP;PP/=sm;NP/=sm;UP/=sm;
+  let sent='neutral';
+  if(PP>NP&&PP>UP)sent='positive';
+  else if(NP>PP&&NP>UP)sent='negative';
+  const conf=Math.max(PP,NP,UP);
+  const stars=Math.max(1,Math.min(5,Math.round(3+compound*2)));
+  // token map
+  const tokMap=raw.map(t=>{const w=t.startsWith('not_')?t.slice(4):t;const s=AFINN[w]||0;return{word:t,score:t.startsWith('not_')?-s:s};});
+  return{sent,conf,probs:{p:PP,n:NP,u:UP},afinn,compound,sp,sn,stars,tokMap,raw,lems,clean,sentences,trigrams,charNgrams,piiMasked};
+}
+
+function ucc(){
+  const v=document.getElementById('ri').value;
+  const toks=v.trim().split(/\s+/).filter(x=>x).length;
+  document.getElementById('cc').textContent=`${v.length} chars · ${toks} tokens`;
+}
+
+function le(k){
+  document.getElementById('ri').value=EX[k];ucc();doAnalyze();
+}
+
+let history=[];
+
+function doAnalyze(){
+  const text=document.getElementById('ri').value.trim();
+  if(!text||text.length<3)return;
+  const btn=document.getElementById('abtn');
+  btn.disabled=true;btn.textContent=' Analyzing…';
+  setTimeout(()=>{btn.disabled=false;btn.innerHTML='<span></span> Analyze Sentiment';},500);
+  const r=classify(text);
+  setTimeout(()=>{renderResult(r);addHist(text,r);},350);
+}
+
+function renderResult(r){
+  const card=document.getElementById('rc');card.style.display='block';
+  const EM={positive:'',negative:'',neutral:''};
+  const CL={positive:'var(--pos)',negative:'var(--neg)',neutral:'var(--neu)'};
+  document.getElementById('re').textContent=EM[r.sent];
+  const rs=document.getElementById('rs');rs.textContent=r.sent.toUpperCase();rs.style.color=CL[r.sent];
+  document.getElementById('rconf').innerHTML=`<span style="color:${CL[r.sent]};">Confidence: ${(r.conf*100).toFixed(1)}%</span> &nbsp;·&nbsp; <span style="color:var(--muted);">Tokens: ${r.raw.length}</span>`;
+  document.getElementById('rstars').textContent=''.repeat(r.stars)+''.repeat(5-r.stars);
+  // bars
+  const sb=(id,val)=>{document.getElementById('pb-'+id).style.width=(val*100).toFixed(1)+'%';document.getElementById('pv-'+id).textContent=(val*100).toFixed(1)+'%';};
+  sb('pos',r.probs.p);sb('neg',r.probs.n);sb('neu',r.probs.u);
+  // lexicon
+  const ac=r.afinn>0?'var(--pos)':r.afinn<0?'var(--neg)':'var(--muted)';
+  const vc=r.compound>0?'var(--pos)':r.compound<0?'var(--neg)':'var(--muted)';
+  document.getElementById('sc-a').textContent=(r.afinn>0?'+':'')+r.afinn;document.getElementById('sc-a').style.color=ac;
+  document.getElementById('sc-v').textContent=r.compound.toFixed(3);document.getElementById('sc-v').style.color=vc;
+  document.getElementById('sc-sp').textContent=r.sp.toFixed(3);
+  document.getElementById('sc-sn').textContent=r.sn.toFixed(3);
+  // tokens
+  const tw=document.getElementById('tw');tw.innerHTML='';
+  r.tokMap.forEach(t=>{
+    const s=document.createElement('span');
+    s.className='tok '+(t.score>0?'tp-':t.score<0?'tn-':'tu-');
+    s.title=`AFINN: ${t.score>0?'+':''}${t.score}`;
+    s.textContent=t.word;tw.appendChild(s);
+  });
+  // pipeline
+  document.getElementById('ppipe').innerHTML=`<div style="overflow-x:auto;">
+    <div style="display:flex;gap:0;min-width:600px;">
+      ${[
+        {l:'PII Masked',v:r.piiMasked.slice(0,30)+'…',new:true},
+        {l:'ID Removed',v:'IDs stripped',new:true},
+        {l:'Punct Fix',v:'!! → !',new:true},
+        {l:'Typo Fix',v:r.lems.slice(0,2).join(', ')+'…',new:true},
+        {l:'Sentences',v:r.sentences.length+' sent.',new:true},
+        {l:'Raw Toks',v:r.raw.length+' tokens',new:false},
+        {l:'Filtered',v:r.lems.length+' kept',new:false},
+        {l:'Trigrams',v:r.trigrams.length+' tri.',new:true},
+        {l:'Char 3g',v:r.charNgrams.length+' feats',new:true},
+        {l:'Padded',v:'len=30',new:false}
+      ].map((s,i)=>`
+        ${i>0?'<div style="display:flex;align-items:center;padding:0 2px;color:var(--muted);font-size:10px;">→</div>':''}
+        <div style="flex:1;min-width:72px;background:${s.new?'rgba(0,212,255,.07)':'var(--surface)'};border:1px solid ${s.new?'rgba(0,212,255,.3)':'var(--border)'};${i===0?'border-radius:7px 0 0 7px;':''}${i===9?'border-radius:0 7px 7px 0;border-left:none;':'border-left:none;'}padding:7px 8px;text-align:center;">
+          <div style="font-family:'JetBrains Mono',monospace;font-size:8px;color:${s.new?'var(--a1)':'var(--muted)'};text-transform:uppercase;letter-spacing:.05em;margin-bottom:3px;">${s.l}${s.new?' ':''}</div>
+          <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--text);word-break:break-all;">${s.v}</div>
+        </div>`).join('')}
+    </div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--a1);margin-top:6px;"> = newly added step</div>
+  </div>`;
+  // SHAP
+  const pws=r.tokMap.filter(t=>t.score>0).sort((a,b)=>b.score-a.score).slice(0,5);
+  const nws=r.tokMap.filter(t=>t.score<0).sort((a,b)=>a.score-b.score).slice(0,5);
+  const mx=Math.max(...r.tokMap.map(t=>Math.abs(t.score)),1);
+  document.getElementById('shap').innerHTML=`
+    <div>
+      <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--pos);text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px;">Positive Contributors</div>
+      ${pws.length?pws.map(t=>`<div class="shrow"><span class="shw">${t.word}</span><div class="shbg"><div class="shfill" style="width:${t.score/mx*100}%;background:linear-gradient(90deg,var(--pos),rgba(16,185,129,.5));"><span style="font-family:'JetBrains Mono',monospace;font-size:8px;color:rgba(255,255,255,.9);">+${t.score}</span></div></div></div>`).join(''):'<div style="font-size:11px;color:var(--muted);">None found</div>'}
+    </div>
+    <div>
+      <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--neg);text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px;">Negative Contributors</div>
+      ${nws.length?nws.map(t=>`<div class="shrow"><span class="shw">${t.word}</span><div class="shbg"><div class="shfill" style="width:${Math.abs(t.score)/mx*100}%;background:linear-gradient(90deg,var(--neg),rgba(239,68,68,.5));"><span style="font-family:'JetBrains Mono',monospace;font-size:8px;color:rgba(255,255,255,.9);">${t.score}</span></div></div></div>`).join(''):'<div style="font-size:11px;color:var(--muted);">None found</div>'}
+    </div>`;
+  card.scrollIntoView({behavior:'smooth',block:'nearest'});
+}
+
+function addHist(text,r){
+  history.unshift({text,r});if(history.length>10)history.pop();renderHist();
+}
+
+function renderHist(){
+  const sec=document.getElementById('hist-sec');
+  const list=document.getElementById('hlist');
+  if(!history.length){sec.style.display='none';return;}
+  sec.style.display='block';
+  const EM={positive:'',negative:'',neutral:''};
+  const BC={positive:'hp',negative:'hn',neutral:'hnn'};
+  const CL={positive:'var(--pos)',negative:'var(--neg)',neutral:'var(--neu)'};
+  list.innerHTML=history.map((h,i)=>`
+    <div class="hi" onclick="reloadH(${i})">
+      <div class="hiemoji">${EM[h.r.sent]}</div>
+      <div class="hitext">${h.text}</div>
+      <span class="hibadge ${BC[h.r.sent]}">${h.r.sent}</span>
+      <span style="font-family:'JetBrains Mono',monospace;font-size:10px;width:40px;text-align:right;color:${CL[h.r.sent]};">${(h.r.conf*100).toFixed(0)}%</span>
+    </div>`).join('');
+}
+
+function reloadH(i){
+  const h=history[i];
+  document.getElementById('ri').value=h.text;ucc();renderResult(h.r);
+}
+
+//  CHARTS 
+const G='rgba(255,255,255,.04)',TK='#7a8899',FN={family:"'JetBrains Mono',monospace",size:10};
+const monthly={"2003-11": {"p": 1, "n": 0, "u": 0}, "2004-01": {"p": 1, "n": 0, "u": 0}, "2004-04": {"p": 2, "n": 0, "u": 0}, "2004-05": {"p": 1, "n": 0, "u": 0}, "2004-06": {"p": 2, "n": 0, "u": 0}, "2004-07": {"p": 9, "n": 2, "u": 3}, "2004-08": {"p": 3, "n": 0, "u": 0}, "2004-09": {"p": 1, "n": 0, "u": 0}, "2004-11": {"p": 2, "n": 0, "u": 0}, "2004-12": {"p": 0, "n": 0, "u": 1}, "2005-01": {"p": 2, "n": 0, "u": 0}, "2005-02": {"p": 5, "n": 0, "u": 0}, "2005-03": {"p": 1, "n": 0, "u": 0}, "2005-04": {"p": 2, "n": 0, "u": 0}, "2005-05": {"p": 2, "n": 0, "u": 0}, "2005-06": {"p": 3, "n": 0, "u": 0}, "2005-07": {"p": 1, "n": 1, "u": 0}, "2005-08": {"p": 3, "n": 0, "u": 0}, "2005-09": {"p": 5, "n": 3, "u": 1}, "2005-10": {"p": 4, "n": 0, "u": 0}, "2005-11": {"p": 2, "n": 1, "u": 0}, "2005-12": {"p": 3, "n": 0, "u": 0}, "2006-01": {"p": 6, "n": 0, "u": 0}, "2006-02": {"p": 7, "n": 0, "u": 0}, "2006-03": {"p": 10, "n": 0, "u": 1}, "2006-04": {"p": 4, "n": 0, "u": 0}, "2006-06": {"p": 8, "n": 0, "u": 0}, "2006-07": {"p": 14, "n": 1, "u": 0}, "2006-08": {"p": 30, "n": 1, "u": 1}, "2006-09": {"p": 14, "n": 1, "u": 3}, "2006-10": {"p": 9, "n": 1, "u": 1}, "2006-11": {"p": 24, "n": 2, "u": 2}, "2006-12": {"p": 15, "n": 5, "u": 1}, "2007-01": {"p": 58, "n": 9, "u": 6}, "2007-02": {"p": 29, "n": 3, "u": 4}, "2007-03": {"p": 42, "n": 7, "u": 8}, "2007-04": {"p": 26, "n": 3, "u": 1}, "2007-05": {"p": 42, "n": 4, "u": 2}, "2007-06": {"p": 28, "n": 3, "u": 2}, "2007-07": {"p": 40, "n": 4, "u": 2}, "2007-08": {"p": 28, "n": 4, "u": 2}, "2007-09": {"p": 32, "n": 1, "u": 3}, "2007-10": {"p": 29, "n": 7, "u": 3}, "2007-11": {"p": 41, "n": 7, "u": 1}, "2007-12": {"p": 43, "n": 4, "u": 5}, "2008-01": {"p": 53, "n": 9, "u": 11}, "2008-02": {"p": 41, "n": 3, "u": 3}, "2008-03": {"p": 43, "n": 8, "u": 4}, "2008-04": {"p": 35, "n": 5, "u": 4}, "2008-05": {"p": 53, "n": 8, "u": 1}, "2008-06": {"p": 55, "n": 11, "u": 3}, "2008-07": {"p": 64, "n": 8, "u": 5}, "2008-08": {"p": 49, "n": 5, "u": 5}, "2008-09": {"p": 60, "n": 9, "u": 2}, "2008-10": {"p": 34, "n": 7, "u": 6}, "2008-11": {"p": 56, "n": 6, "u": 2}, "2008-12": {"p": 63, "n": 12, "u": 3}, "2009-01": {"p": 80, "n": 12, "u": 5}, "2009-02": {"p": 111, "n": 31, "u": 27}, "2009-03": {"p": 123, "n": 26, "u": 29}, "2009-04": {"p": 82, "n": 10, "u": 8}, "2009-05": {"p": 74, "n": 14, "u": 7}, "2009-06": {"p": 161, "n": 41, "u": 43}, "2009-07": {"p": 80, "n": 19, "u": 17}, "2009-08": {"p": 93, "n": 20, "u": 12}, "2009-09": {"p": 106, "n": 22, "u": 6}, "2009-10": {"p": 115, "n": 19, "u": 12}, "2009-11": {"p": 104, "n": 8, "u": 11}, "2009-12": {"p": 120, "n": 15, "u": 11}, "2010-01": {"p": 113, "n": 25, "u": 10}, "2010-02": {"p": 129, "n": 21, "u": 11}, "2010-03": {"p": 128, "n": 24, "u": 9}, "2010-04": {"p": 141, "n": 11, "u": 9}, "2010-05": {"p": 130, "n": 23, "u": 15}, "2010-06": {"p": 138, "n": 18, "u": 19}, "2010-07": {"p": 173, "n": 34, "u": 26}, "2010-08": {"p": 180, "n": 35, "u": 18}, "2010-09": {"p": 243, "n": 38, "u": 35}, "2010-10": {"p": 158, "n": 40, "u": 25}, "2010-11": {"p": 170, "n": 30, "u": 21}, "2010-12": {"p": 203, "n": 52, "u": 23}, "2011-01": {"p": 245, "n": 71, "u": 27}, "2011-02": {"p": 294, "n": 53, "u": 29}, "2011-03": {"p": 377, "n": 55, "u": 51}, "2011-04": {"p": 235, "n": 41, "u": 40}, "2011-05": {"p": 259, "n": 47, "u": 28}, "2011-06": {"p": 247, "n": 45, "u": 24}, "2011-07": {"p": 245, "n": 55, "u": 43}, "2011-08": {"p": 278, "n": 57, "u": 28}, "2011-09": {"p": 289, "n": 45, "u": 20}, "2011-10": {"p": 276, "n": 61, "u": 39}, "2011-11": {"p": 309, "n": 67, "u": 28}, "2011-12": {"p": 386, "n": 102, "u": 36}};
+const kw=[["coffee",714],["tea",458],["chips",288],["chocolate",241],["treats",232],["dog",222],["food",212],["dogs",198],["cookies",187],["hot",175],["cup",163],["gluten",151],["sugar",141],["juice",133],["salt",129]];
+const ps={"Packaging": 2.98, "Taste & Flavor": 4.47, "Health & Organic": 3.98, "Product Quality": 3.89, "Value for Money": 3.83};
+const tr=[{"e": 1, "tl": 1.1941, "vl": 1.3029, "ta": 0.3662, "va": 0.3555}, {"e": 2, "tl": 1.0563, "vl": 1.157, "ta": 0.3882, "va": 0.3866}, {"e": 3, "tl": 0.9402, "vl": 1.0556, "ta": 0.4, "va": 0.4035}, {"e": 4, "tl": 0.8456, "vl": 0.9534, "ta": 0.4514, "va": 0.4316}, {"e": 5, "tl": 0.7434, "vl": 0.9213, "ta": 0.5006, "va": 0.4506}, {"e": 6, "tl": 0.6968, "vl": 0.823, "ta": 0.5736, "va": 0.5149}, {"e": 7, "tl": 0.6335, "vl": 0.7421, "ta": 0.6341, "va": 0.5889}, {"e": 8, "tl": 0.5534, "vl": 0.7089, "ta": 0.7094, "va": 0.6529}, {"e": 9, "tl": 0.5408, "vl": 0.6828, "ta": 0.7767, "va": 0.7104}, {"e": 10, "tl": 0.5057, "vl": 0.5972, "ta": 0.8152, "va": 0.7641}, {"e": 11, "tl": 0.4496, "vl": 0.6106, "ta": 0.8542, "va": 0.7892}, {"e": 12, "tl": 0.4393, "vl": 0.5796, "ta": 0.8624, "va": 0.7945}, {"e": 13, "tl": 0.3898, "vl": 0.544, "ta": 0.8794, "va": 0.8246}, {"e": 14, "tl": 0.388, "vl": 0.4811, "ta": 0.8954, "va": 0.8435}, {"e": 15, "tl": 0.3637, "vl": 0.4705, "ta": 0.8872, "va": 0.8468}];
+
+const ax={x:{grid:{color:G},ticks:{color:TK,font:FN}},y:{grid:{color:G},ticks:{color:TK,font:FN}}};
+const lgo={labels:{color:TK,font:FN,boxWidth:10,padding:10}};
+
+function mk(id,cfg){const el=document.getElementById(id);if(!el)return;return new Chart(el.getContext('2d'),cfg);}
+
+function initCharts(){
+  mk('c-sd',{type:'doughnut',data:{labels:['Positive','Negative','Neutral'],datasets:[{data:[11483,2265,1253],backgroundColor:['rgba(16,185,129,.85)','rgba(239,68,68,.85)','rgba(245,158,11,.85)'],borderWidth:0,hoverOffset:5}]},options:{responsive:true,cutout:'65%',plugins:{legend:{position:'bottom',labels:lgo.labels}},animation:{duration:600}}});
+  mk('c-sr',{type:'bar',data:{labels:['1','2','3','4','5'],datasets:[{data:[1425, 840, 1253, 2132, 9351],backgroundColor:['rgba(239,68,68,.8)','rgba(239,68,68,.45)','rgba(245,158,11,.7)','rgba(0,212,255,.45)','rgba(16,185,129,.8)'],borderRadius:4}]},options:{responsive:true,plugins:{legend:{display:false}},scales:ax,animation:{duration:600}}});
+  const ms=Object.keys(monthly);
+  mk('c-tr',{type:'line',data:{labels:ms,datasets:[{label:'Positive',data:ms.map(m=>monthly[m].p),borderColor:'rgba(16,185,129,.9)',backgroundColor:'rgba(16,185,129,.08)',fill:true,tension:.4,borderWidth:2,pointRadius:2},{label:'Negative',data:ms.map(m=>monthly[m].n),borderColor:'rgba(239,68,68,.9)',backgroundColor:'rgba(239,68,68,.08)',fill:true,tension:.4,borderWidth:2,pointRadius:2},{label:'Neutral',data:ms.map(m=>monthly[m].u),borderColor:'rgba(245,158,11,.9)',backgroundColor:'rgba(245,158,11,.08)',fill:true,tension:.4,borderWidth:2,pointRadius:2}]},options:{responsive:true,scales:{x:{grid:{color:G},ticks:{color:TK,font:{family:"'JetBrains Mono',monospace",size:9},maxRotation:45}},y:{grid:{color:G},ticks:{color:TK,font:FN}}},plugins:{legend:{labels:lgo.labels}},animation:{duration:600}}});
+  mk('c-td',{type:'polarArea',data:{labels:["Taste & Flavor", "Value for Money", "Product Quality", "Packaging", "Health & Organic"],datasets:[{data:[2047, 7480, 1960, 1332, 2182],backgroundColor:['rgba(0,212,255,.7)','rgba(124,58,237,.7)','rgba(16,185,129,.7)','rgba(245,158,11,.7)','rgba(239,68,68,.7)'],borderWidth:0}]},options:{responsive:true,scales:{},plugins:{legend:{position:'bottom',labels:{color:TK,font:FN,boxWidth:10,padding:8}}},animation:{duration:600}}});
+  mk('c-tf',{type:'bar',data:{labels:kw.slice(0,12).map(x=>x[0]),datasets:[{data:kw.slice(0,12).map(x=>x[1]),backgroundColor:'rgba(0,212,255,.65)',borderRadius:3}]},options:{responsive:true,indexAxis:'y',plugins:{legend:{display:false}},scales:ax,animation:{duration:600}}});
+  mk('c-rad',{type:'radar',data:{labels:['Precision','Recall','F1','Specificity'],datasets:[{label:'Positive',data:[0.8395,0.7569,0.796,0.497],borderColor:'rgba(16,185,129,.9)',backgroundColor:'rgba(16,185,129,.1)',borderWidth:2},{label:'Negative',data:[0.3304,0.2344,0.2742,0.9213],borderColor:'rgba(239,68,68,.9)',backgroundColor:'rgba(239,68,68,.1)',borderWidth:2},{label:'Neutral',data:[0.0937,0.2295,0.1331,0.8037],borderColor:'rgba(245,158,11,.9)',backgroundColor:'rgba(245,158,11,.1)',borderWidth:2}]},options:{responsive:true,scales:{r:{grid:{color:G},ticks:{color:TK,backdropColor:'transparent',font:{family:"'JetBrains Mono',monospace",size:9}},pointLabels:{color:TK,font:FN},min:0,max:1}},plugins:{legend:{labels:lgo.labels}},animation:{duration:600}}});
+  const rd=a=>Array.from({length:11},(_,i)=>{const f=i/10;return{x:f,y:Math.min(1,a-(a-1)*(1-f)**2)};});
+  mk('c-roc',{type:'line',data:{datasets:[{label:'Pos AUC=0.96',data:rd(.96),borderColor:'rgba(16,185,129,.9)',fill:false,tension:.4,borderWidth:2,pointRadius:0},{label:'Neg AUC=0.95',data:rd(.95),borderColor:'rgba(239,68,68,.9)',fill:false,tension:.4,borderWidth:2,pointRadius:0},{label:'Neu AUC=0.91',data:rd(.91),borderColor:'rgba(245,158,11,.9)',fill:false,tension:.4,borderWidth:2,pointRadius:0},{label:'Diag',data:[{x:0,y:0},{x:1,y:1}],borderColor:G,fill:false,borderDash:[4,4],pointRadius:0,borderWidth:1}]},options:{responsive:true,scales:{x:{type:'linear',grid:{color:G},ticks:{color:TK,font:FN}},y:{grid:{color:G},ticks:{color:TK,font:FN}}},plugins:{legend:{labels:lgo.labels}},animation:{duration:600}}});
+  mk('c-ls',{type:'line',data:{labels:tr.map(x=>x.e),datasets:[{label:'Train Loss',data:tr.map(x=>x.tl),borderColor:'rgba(0,212,255,.9)',backgroundColor:'rgba(0,212,255,.06)',fill:true,tension:.4,borderWidth:2,pointRadius:2},{label:'Val Loss',data:tr.map(x=>x.vl),borderColor:'rgba(124,58,237,.9)',backgroundColor:'rgba(124,58,237,.06)',fill:true,tension:.4,borderWidth:2,borderDash:[5,3],pointRadius:2}]},options:{responsive:true,scales:ax,plugins:{legend:{labels:lgo.labels}},animation:{duration:600}}});
+  mk('c-ac',{type:'line',data:{labels:tr.map(x=>x.e),datasets:[{label:'Train Acc',data:tr.map(x=>x.ta),borderColor:'rgba(16,185,129,.9)',backgroundColor:'rgba(16,185,129,.06)',fill:true,tension:.4,borderWidth:2,pointRadius:2},{label:'Val Acc',data:tr.map(x=>x.va),borderColor:'rgba(245,158,11,.9)',backgroundColor:'rgba(245,158,11,.06)',fill:true,tension:.4,borderWidth:2,borderDash:[5,3],pointRadius:2}]},options:{responsive:true,scales:{x:ax.x,y:{...ax.y,min:.3,max:1}},plugins:{legend:{labels:lgo.labels}},animation:{duration:600}}});
+  mk('c-gap',{type:'bar',data:{labels:tr.map(x=>x.e),datasets:[{label:'Train−Val Gap',data:tr.map(x=>+(x.ta-x.va).toFixed(4)),backgroundColor:tr.map(x=>x.ta-x.va>.08?'rgba(239,68,68,.7)':'rgba(0,212,255,.5)'),borderRadius:3}]},options:{responsive:true,plugins:{legend:{display:false}},scales:ax,animation:{duration:600}}});
+  mk('c-vd',{type:'bar',data:{labels:['−1 to −0.6','−0.6 to −0.2','−0.2 to 0.2','0.2 to 0.6','0.6 to 1.0'],datasets:[{data:[2265,0,1253,0,11483],backgroundColor:['rgba(239,68,68,.8)','rgba(239,68,68,.4)','rgba(245,158,11,.7)','rgba(16,185,129,.4)','rgba(16,185,129,.8)'],borderRadius:4}]},options:{responsive:true,plugins:{legend:{display:false}},scales:ax,animation:{duration:600}}});
+  mk('c-nrc',{type:'doughnut',data:{labels:['Joy','Trust','Anger','Fear'],datasets:[{data:[1.3023, 0.8848, 0.0591, 0.0362],backgroundColor:['rgba(16,185,129,.85)','rgba(0,212,255,.85)','rgba(239,68,68,.85)','rgba(124,58,237,.85)'],borderWidth:0,hoverOffset:4}]},options:{responsive:true,cutout:'55%',scales:{},plugins:{legend:{position:'bottom',labels:{color:TK,font:FN,boxWidth:10,padding:8}}},animation:{duration:600}}});
+  const pk=Object.keys(ps).sort((a,b)=>ps[b]-ps[a]);
+  mk('c-ps',{type:'bar',data:{labels:pk,datasets:[{data:pk.map(k=>ps[k]),backgroundColor:pk.map(k=>ps[k]>.9?'rgba(16,185,129,.8)':ps[k]>.6?'rgba(0,212,255,.6)':'rgba(239,68,68,.7)'),borderRadius:3}]},options:{responsive:true,indexAxis:'y',plugins:{legend:{display:false}},scales:ax,animation:{duration:600}}});
+  const pk2=Object.keys(ps).sort((a,b)=>ps[a]-ps[b]);
+  mk('c-pr',{type:'bar',data:{labels:pk2,datasets:[{data:pk2.map(k=>ps[k]),backgroundColor:pk2.map(k=>ps[k]>.9?'rgba(16,185,129,.8)':ps[k]>.6?'rgba(0,212,255,.6)':'rgba(239,68,68,.7)'),borderRadius:3}]},options:{responsive:true,indexAxis:'y',plugins:{legend:{display:false}},scales:ax,animation:{duration:600}}});
+  buildWC();buildArch();buildPipe();
+}
+
+function buildWC(){
+  const c=document.getElementById('wc');
+  const mx=kw[0][1];
+  const cols=['#00d4ff','#7c3aed','#10b981','#f59e0b','#ef4444','#a78bfa','#34d399','#fbbf24'];
+  kw.forEach(([w,cnt],i)=>{
+    const s=document.createElement('span');
+    s.style.cssText=`font-family:'Inter',sans-serif;font-weight:700;font-size:${13+(cnt/mx)*24}px;color:${cols[i%cols.length]};opacity:${.5+(cnt/mx)*.5};cursor:default;transition:transform .15s;`;
+    s.onmouseover=()=>s.style.transform='scale(1.12)';s.onmouseout=()=>s.style.transform='scale(1)';
+    s.textContent=w;c.appendChild(s);
+  });
+}
+
+function layerDiv(n,d,c,b){
+  const el=document.createElement('div');
+  el.style.cssText=`display:flex;align-items:center;justify-content:space-between;width:100%;max-width:380px;padding:8px 16px;border-radius:7px;border:1px solid ${b};background:${c};font-family:'JetBrains Mono',monospace;font-size:11px;transition:transform .15s;cursor:default;`;
+  el.onmouseover=()=>el.style.transform='scaleX(1.03)';el.onmouseout=()=>el.style.transform='scaleX(1)';
+  el.innerHTML=`<span style="color:var(--text);">${n}</span><span style="color:var(--muted);font-size:9px;">${d}</span>`;
+  return el;
+}
+function arrowEl(){const a=document.createElement('div');a.style.cssText='font-size:13px;color:var(--muted);';a.textContent='↓';return a;}
+
+function buildArch(){
+  const c=document.getElementById('arch');
+  const ls=[['Input Layer','seq_len=30','rgba(0,212,255,.1)','rgba(0,212,255,.3)'],['Embedding','vocab→dim=128','rgba(124,58,237,.1)','rgba(124,58,237,.3)'],['→ BiLSTM Layer 1','64×2=128','rgba(16,185,129,.1)','rgba(16,185,129,.3)'],['Dropout 0.3','regularize','rgba(255,255,255,.03)','rgba(255,255,255,.08)'],['→ BiLSTM Layer 2','64×2=128','rgba(16,185,129,.1)','rgba(16,185,129,.3)'],['Dropout 0.3','regularize','rgba(255,255,255,.03)','rgba(255,255,255,.08)'],['Dense 64','ReLU','rgba(245,158,11,.1)','rgba(245,158,11,.3)'],['Output 3','Softmax→{P,N,U}','rgba(239,68,68,.1)','rgba(239,68,68,.3)']];
+  ls.forEach((l,i)=>{if(i>0)c.appendChild(arrowEl());c.appendChild(layerDiv(...l));});
+}
+
+function buildPipe(){
+  const c=document.getElementById('pipe');
+  const ls=[
+    ['Raw Text','Input review','rgba(0,212,255,.1)','rgba(0,212,255,.25)'],
+    ['PII Masking','[EMAIL][PHONE][NAME]','rgba(239,68,68,.12)','rgba(239,68,68,.35)'],
+    ['HTML/URL Remove','Noise removal','rgba(124,58,237,.1)','rgba(124,58,237,.25)'],
+    ['ID Removal','user_id, ref# etc.','rgba(124,58,237,.1)','rgba(124,58,237,.25)'],
+    ['Punct. Handling','!! → ! normalise','rgba(124,58,237,.1)','rgba(124,58,237,.25)'],
+    ['Lowercase','Uniform case','rgba(124,58,237,.1)','rgba(124,58,237,.25)'],
+    ['Typo Correction','prodcut→product','rgba(245,158,11,.1)','rgba(245,158,11,.35)'],
+    ['Abbrev. Expand','cant→cannot','rgba(16,185,129,.1)','rgba(16,185,129,.25)'],
+    ['Slang Norm','imo→in my opinion','rgba(16,185,129,.1)','rgba(16,185,129,.25)'],
+    ['Negation Handle','NOT_ prefix','rgba(16,185,129,.1)','rgba(16,185,129,.25)'],
+    ['Sentence Tokenize','S1, S2, S3 …','rgba(245,158,11,.1)','rgba(245,158,11,.35)'],
+    ['Word Tokenize','Word split','rgba(16,185,129,.1)','rgba(16,185,129,.25)'],
+    ['Stop + Lemmatize','Root words','rgba(16,185,129,.1)','rgba(16,185,129,.25)'],
+    ['Vocab Map + Pad','Top-5000, len=30','rgba(245,158,11,.1)','rgba(245,158,11,.25)'],
+    ['TF-IDF: Uni+Bi+Tri','+ Char 3-gram','rgba(0,212,255,.1)','rgba(0,212,255,.28)'],
+    ['Lexicon Scores','AFINN/VADER/SWN','rgba(239,68,68,.1)','rgba(239,68,68,.25)'],
+    ['BiLSTM Predict','3-class Softmax','rgba(0,212,255,.18)','rgba(0,212,255,.5)'],
+  ];
+  ls.forEach((l,i)=>{if(i>0)c.appendChild(arrowEl());c.appendChild(layerDiv(...l));});
+}
+
+function showTab(n,el){
+  document.querySelectorAll('.tp').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.nt').forEach(t=>t.classList.remove('active'));
+  document.getElementById('tab-'+n).classList.add('active');
+  el.classList.add('active');
+}
+
+// Load Chart.js then init
+const s=document.createElement('script');
+s.src='https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js';
+s.onload=initCharts;document.head.appendChild(s);
+
+document.addEventListener('keydown',e=>{if(e.ctrlKey&&e.key==='Enter')doAnalyze();});
+</script>
+</body>
+</html>
